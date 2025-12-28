@@ -2,15 +2,19 @@ import { homedir } from "node:os";
 import { join } from "node:path";
 import type { Config } from "./types";
 
-const DATA_DIR = join(homedir(), ".pr-review-slo");
+const DEFAULT_DATA_DIR = join(homedir(), ".pr-review-slo");
 
-export const paths = {
-  dataDir: DATA_DIR,
-  config: join(DATA_DIR, "config.toml"),
-  budgetRuns: join(DATA_DIR, "budget-runs.jsonl"),
-  pto: join(DATA_DIR, "pto.jsonl"),
-  holidayCache: (year: number) => join(DATA_DIR, `holidays-${year}.json`),
-};
+export function getPaths(dataDir: string = DEFAULT_DATA_DIR) {
+  return {
+    dataDir,
+    config: join(dataDir, "config.toml"),
+    budgetRuns: join(dataDir, "budget-runs.jsonl"),
+    pto: join(dataDir, "pto.jsonl"),
+    holidayCache: (year: number) => join(dataDir, `holidays-${year}.json`),
+  };
+}
+
+export const paths = getPaths();
 
 const DEFAULT_CONFIG: Config = {
   github: {
@@ -34,17 +38,19 @@ const DEFAULT_CONFIG: Config = {
   },
 };
 
-export async function ensureDataDir(): Promise<void> {
-  const dir = Bun.file(paths.dataDir);
+export type Paths = ReturnType<typeof getPaths>;
+
+export async function ensureDataDir(p: Paths = paths): Promise<void> {
+  const dir = Bun.file(p.dataDir);
   if (!(await dir.exists())) {
-    await Bun.write(paths.dataDir + "/.keep", "");
+    await Bun.write(p.dataDir + "/.keep", "");
   }
 }
 
-export async function loadConfig(): Promise<Config> {
-  await ensureDataDir();
+export async function loadConfig(p: Paths = paths): Promise<Config> {
+  await ensureDataDir(p);
 
-  const configFile = Bun.file(paths.config);
+  const configFile = Bun.file(p.config);
   if (!(await configFile.exists())) {
     return DEFAULT_CONFIG;
   }
@@ -73,8 +79,11 @@ function mergeConfig(defaults: Config, overrides: Partial<Config>): Config {
   };
 }
 
-export async function saveDefaultConfig(username: string): Promise<void> {
-  await ensureDataDir();
+export async function saveDefaultConfig(
+  username: string,
+  p: Paths = paths
+): Promise<void> {
+  await ensureDataDir(p);
 
   const content = `# PR Review SLO Configuration
 
@@ -105,7 +114,7 @@ maxLoc = 800
 businessDays = 3
 `;
 
-  await Bun.write(paths.config, content);
+  await Bun.write(p.config, content);
 }
 
 /** Exported for testing */
