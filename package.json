@@ -1,8 +1,16 @@
 {
   "name": "pr-review-slo",
-  "module": "index.ts",
+  "version": "1.0.0",
+  "module": "src/cli.ts",
   "type": "module",
   "private": true,
+  "bin": {
+    "pr-review-slo": "src/cli.ts"
+  },
+  "scripts": {
+    "start": "bun run src/cli.ts",
+    "test": "bun test"
+  },
   "devDependencies": {
     "@types/bun": "latest"
   },
