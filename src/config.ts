@@ -76,34 +76,11 @@ function mergeConfig(defaults: Config, overrides: Partial<Config>): Config {
 export async function saveDefaultConfig(username: string): Promise<void> {
   await ensureDataDir();
 
-  const content = `# PR Review SLO Configuration
+  const config: Config = {
+    ...DEFAULT_CONFIG,
+    github: { ...DEFAULT_CONFIG.github, username },
+  };
 
-[github]
-username = "${username}"
-# repos = ["org/repo", "org2/*"]  # Optional: filter to specific repos
-
-[businessHours]
-start = 9
-end = 19
-timezone = "America/Los_Angeles"
-
-# Business days: 1=Mon, 7=Sun
-businessDays = [1, 2, 3, 4, 5]
-
-holidayCountryCode = "US"
-
-[slo]
-target = 0.90
-windowDays = 30
-
-[sizeBuckets.small]
-maxLoc = 200
-businessDays = 1
-
-[sizeBuckets.medium]
-maxLoc = 800
-businessDays = 3
-`;
-
+  const content = Bun.TOML.stringify(config);
   await Bun.write(paths.config, content);
 }
