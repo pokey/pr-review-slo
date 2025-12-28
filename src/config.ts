@@ -2,15 +2,19 @@ import { homedir } from "node:os";
 import { join } from "node:path";
 import type { Config } from "./types";
 
-const DATA_DIR = join(homedir(), ".pr-review-slo");
+const DEFAULT_DATA_DIR = join(homedir(), ".pr-review-slo");
 
-export const paths = {
-  dataDir: DATA_DIR,
-  config: join(DATA_DIR, "config.toml"),
-  budgetRuns: join(DATA_DIR, "budget-runs.jsonl"),
-  pto: join(DATA_DIR, "pto.jsonl"),
-  holidayCache: (year: number) => join(DATA_DIR, `holidays-${year}.json`),
-};
+export function getPaths(dataDir: string = DEFAULT_DATA_DIR) {
+  return {
+    dataDir,
+    config: join(dataDir, "config.toml"),
+    budgetRuns: join(dataDir, "budget-runs.jsonl"),
+    pto: join(dataDir, "pto.jsonl"),
+    holidayCache: (year: number) => join(dataDir, `holidays-${year}.json`),
+  };
+}
+
+export const paths = getPaths();
 
 const DEFAULT_CONFIG: Config = {
   github: {
@@ -34,86 +38,27 @@ const DEFAULT_CONFIG: Config = {
   },
 };
 
-export async function ensureDataDir(): Promise<void> {
-  const dir = Bun.file(paths.dataDir);
+export type Paths = ReturnType<typeof getPaths>;
+
+export async function ensureDataDir(p: Paths = paths): Promise<void> {
+  const dir = Bun.file(p.dataDir);
   if (!(await dir.exists())) {
-    await Bun.write(paths.dataDir + "/.keep", "");
+    await Bun.write(p.dataDir + "/.keep", "");
   }
 }
 
-export async function loadConfig(): Promise<Config> {
-  await ensureDataDir();
+export async function loadConfig(p: Paths = paths): Promise<Config> {
+  await ensureDataDir(p);
 
-  const configFile = Bun.file(paths.config);
+  const configFile = Bun.file(p.config);
   if (!(await configFile.exists())) {
     return DEFAULT_CONFIG;
   }
 
   const tomlContent = await configFile.text();
-  const parsed = parseTOML(tomlContent);
+  const parsed = Bun.TOML.parse(tomlContent) as Partial<Config>;
 
   return mergeConfig(DEFAULT_CONFIG, parsed);
-}
-
-function parseTOML(content: string): Partial<Config> {
-  const result: Record<string, unknown> = {};
-  let currentSection: string | null = null;
-
-  for (const line of content.split("\n")) {
-    const trimmed = line.trim();
-
-    // Skip empty lines and comments
-    if (!trimmed || trimmed.startsWith("#")) continue;
-
-    // Section header
-    const sectionMatch = trimmed.match(/^\[([^\]]+)\]$/);
-    if (sectionMatch) {
-      currentSection = sectionMatch[1]!;
-      const parts = currentSection.split(".");
-      let obj = result;
-      for (const part of parts) {
-        obj[part] = obj[part] || {};
-        obj = obj[part] as Record<string, unknown>;
-      }
-      continue;
-    }
-
-    // Key-value pair
-    const kvMatch = trimmed.match(/^([^=]+)=\s*(.+)$/);
-    if (kvMatch) {
-      const key = kvMatch[1]!.trim();
-      let value: unknown = kvMatch[2]!.trim();
-
-      // Parse value type
-      if (value === "true") value = true;
-      else if (value === "false") value = false;
-      else if (/^-?\d+(\.\d+)?$/.test(value as string))
-        value = parseFloat(value as string);
-      else if ((value as string).startsWith('"'))
-        value = (value as string).slice(1, -1);
-      else if ((value as string).startsWith("[")) {
-        // Simple array parsing
-        const arrayContent = (value as string).slice(1, -1);
-        value = arrayContent
-          .split(",")
-          .map((v) => v.trim().replace(/^"|"$/g, ""))
-          .filter((v) => v);
-      }
-
-      if (currentSection) {
-        const parts = currentSection.split(".");
-        let obj = result;
-        for (const part of parts) {
-          obj = obj[part] as Record<string, unknown>;
-        }
-        obj[key] = value;
-      } else {
-        result[key] = value;
-      }
-    }
-  }
-
-  return result as Partial<Config>;
 }
 
 function mergeConfig(defaults: Config, overrides: Partial<Config>): Config {
@@ -134,10 +79,18 @@ function mergeConfig(defaults: Config, overrides: Partial<Config>): Config {
   };
 }
 
-export async function saveDefaultConfig(username: string): Promise<void> {
-  await ensureDataDir();
+export async function saveDefaultConfig(
+  username: string,
+  p: Paths = paths
+): Promise<void> {
+  await ensureDataDir(p);
 
   const content = `# PR Review SLO Configuration
+
+# Business days: 1=Mon, 7=Sun
+businessDays = [1, 2, 3, 4, 5]
+
+holidayCountryCode = "US"
 
 [github]
 username = "${username}"
@@ -147,11 +100,6 @@ username = "${username}"
 start = 9
 end = 19
 timezone = "America/Los_Angeles"
-
-# Business days: 1=Mon, 7=Sun
-businessDays = [1, 2, 3, 4, 5]
-
-holidayCountryCode = "US"
 
 [slo]
 target = 0.90
@@ -166,5 +114,8 @@ maxLoc = 800
 businessDays = 3
 `;
 
-  await Bun.write(paths.config, content);
+  await Bun.write(p.config, content);
 }
+
+/** Exported for testing */
+export { DEFAULT_CONFIG };
