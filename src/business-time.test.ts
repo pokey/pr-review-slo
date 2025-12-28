@@ -73,6 +73,16 @@ describe("business-time", () => {
       const end = new Date("2025-01-06T10:00:00-08:00");
       expect(countBusinessMinutes(start, end, ctx)).toBe(60);
     });
+
+    test("counts minutes spanning multiple business days", () => {
+      // Monday 3:00 PM to Tuesday 11:00 AM
+      // Monday: 15:00-17:00 = 2 hours = 120 minutes
+      // Tuesday: 09:00-11:00 = 2 hours = 120 minutes
+      // Total: 240 minutes
+      const start = new Date("2025-01-06T15:00:00-08:00"); // Monday 3 PM
+      const end = new Date("2025-01-07T11:00:00-08:00"); // Tuesday 11 AM
+      expect(countBusinessMinutes(start, end, ctx)).toBe(240);
+    });
   });
 
   describe("addBusinessDays", () => {
