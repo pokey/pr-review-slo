@@ -3,7 +3,7 @@
   "version": "1.0.0",
   "module": "src/cli.ts",
   "type": "module",
-  "private": true,
+  "files": ["src"],
   "bin": {
     "pr-review-slo": "src/cli.ts"
   },

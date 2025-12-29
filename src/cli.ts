@@ -1,3 +1,4 @@
+#!/usr/bin/env bun
 import { parseArgs } from "node:util";
 import { computeErrorBudgetContributionCommand } from "./commands/compute-error-budget";
 import { getPRsToReviewCommand } from "./commands/get-prs-to-review";
