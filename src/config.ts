@@ -1,3 +1,4 @@
+import { mkdir } from "node:fs/promises";
 import { homedir } from "node:os";
 import { join } from "node:path";
 import type { Config } from "./types";
@@ -41,9 +42,10 @@ const DEFAULT_CONFIG: Config = {
 export type Paths = ReturnType<typeof getPaths>;
 
 export async function ensureDataDir(p: Paths = paths): Promise<void> {
-  const dir = Bun.file(p.dataDir);
-  if (!(await dir.exists())) {
-    await Bun.write(p.dataDir + "/.keep", "");
+  await mkdir(p.dataDir, { recursive: true });
+  const gitignore = Bun.file(join(p.dataDir, ".gitignore"));
+  if (!(await gitignore.exists())) {
+    await Bun.write(gitignore, "holidays-*.json\n");
   }
 }
 
