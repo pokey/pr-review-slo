@@ -130,9 +130,12 @@ export async function statusCommand(options: StatusOptions): Promise<void> {
     `${label("Business days")}    ${value(config.businessDays.map((d) => ["", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"][d]).join(", "))}`
   );
   console.log(`${label("Holiday country")}  ${value(config.holidayCountryCode)}`);
-  console.log(
-    `${label("Size buckets")}     ${pc.dim("S")} ${value(`<${config.sizeBuckets.small.maxLoc} LOC, ${config.sizeBuckets.small.businessDays}d`)}  ${pc.dim("M")} ${value(`<${config.sizeBuckets.medium.maxLoc} LOC, ${config.sizeBuckets.medium.businessDays}d`)}`
-  );
+  const bucketEntries = Object.entries(config.sizeBuckets)
+    .sort(([, a], [, b]) => a.maxLoc - b.maxLoc);
+  const bucketStr = bucketEntries
+    .map(([name, bucket]) => `${pc.dim(name)} ${value(`<${bucket.maxLoc} LOC, ${bucket.businessDays}d`)}`)
+    .join("  ");
+  console.log(`${label("Size buckets")}     ${bucketStr}`);
 
   // Active PTO
   if (activePTO.length > 0) {

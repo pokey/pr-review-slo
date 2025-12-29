@@ -44,10 +44,10 @@ describe("slo", () => {
       expect(assignBucket(799, mockConfig)).toBe("medium");
     });
 
-    test("assigns large bucket for >=800 LOC", () => {
-      expect(assignBucket(800, mockConfig)).toBe("large");
-      expect(assignBucket(1000, mockConfig)).toBe("large");
-      expect(assignBucket(10000, mockConfig)).toBe("large");
+    test("returns null for >=800 LOC (exceeds all buckets)", () => {
+      expect(assignBucket(800, mockConfig)).toBeNull();
+      expect(assignBucket(1000, mockConfig)).toBeNull();
+      expect(assignBucket(10000, mockConfig)).toBeNull();
     });
   });
 
@@ -60,8 +60,8 @@ describe("slo", () => {
       expect(getAllowedBusinessDays("medium", mockConfig)).toBe(3);
     });
 
-    test("returns 0 days for large bucket", () => {
-      expect(getAllowedBusinessDays("large", mockConfig)).toBe(0);
+    test("returns 0 days for null bucket (excluded)", () => {
+      expect(getAllowedBusinessDays(null, mockConfig)).toBe(0);
     });
   });
 
@@ -96,12 +96,12 @@ describe("slo", () => {
       expect(result.deadline.toISOString()).toBe("2025-01-09T18:00:00.000Z");
     });
 
-    test("marks large PR as large bucket", () => {
+    test("marks excluded PR that exceeds all buckets", () => {
       const pr = makePR(1000, new Date("2025-01-06T10:00:00-08:00"));
       const result = computeDeadline(pr, mockConfig, mockCtx);
 
-      expect(result.bucket).toBe("large");
-      expect(result.isOverdue).toBe(false); // Large PRs are never overdue
+      expect(result.bucket).toBe("excluded");
+      expect(result.isOverdue).toBe(false); // Excluded PRs are never overdue
     });
 
     test("correctly identifies overdue PR", () => {
@@ -125,7 +125,7 @@ describe("slo", () => {
   describe("getMinDeadline", () => {
     const makePRWithDeadline = (
       deadline: Date,
-      bucket: "small" | "medium" | "large" = "small"
+      bucket: string = "small"
     ): PRWithDeadline => ({
       repo: "org/repo",
       number: 1,

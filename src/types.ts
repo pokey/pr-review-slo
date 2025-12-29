@@ -14,10 +14,7 @@ export interface Config {
     target: number; // 0.90
     windowDays: number; // 30
   };
-  sizeBuckets: {
-    small: { maxLoc: number; businessDays: number };
-    medium: { maxLoc: number; businessDays: number };
-  };
+  sizeBuckets: Record<string, { maxLoc: number; businessDays: number }>;
 }
 
 export interface PR {
@@ -34,7 +31,7 @@ export interface PR {
 
 export interface PRWithDeadline extends PR {
   deadline: Date;
-  bucket: "small" | "medium" | "large";
+  bucket: string;
   isOverdue: boolean;
 }
 

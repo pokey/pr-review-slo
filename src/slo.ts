@@ -13,26 +13,32 @@ import {
   getTotalBusinessMinutesInWindow,
 } from "./business-time";
 
+/** Get buckets sorted by maxLoc ascending */
+export function getSortedBuckets(config: Config): Array<[string, { maxLoc: number; businessDays: number }]> {
+  return Object.entries(config.sizeBuckets).sort(([, a], [, b]) => a.maxLoc - b.maxLoc);
+}
+
+/** Assign a PR to a bucket based on LOC. Returns null if PR exceeds all buckets (excluded from SLO). */
 export function assignBucket(
   loc: number,
   config: Config
-): "small" | "medium" | "large" {
-  if (loc < config.sizeBuckets.small.maxLoc) {
-    return "small";
+): string | null {
+  const sortedBuckets = getSortedBuckets(config);
+  for (const [name, bucket] of sortedBuckets) {
+    if (loc < bucket.maxLoc) {
+      return name;
+    }
   }
-  if (loc < config.sizeBuckets.medium.maxLoc) {
-    return "medium";
-  }
-  return "large";
+  return null; // Exceeds all buckets, excluded from SLO
 }
 
 export function getAllowedBusinessDays(
-  bucket: "small" | "medium" | "large",
+  bucket: string | null,
   config: Config
 ): number {
-  if (bucket === "small") return config.sizeBuckets.small.businessDays;
-  if (bucket === "medium") return config.sizeBuckets.medium.businessDays;
-  return 0; // Large PRs are excluded
+  if (bucket === null) return 0; // Excluded PRs
+  const bucketConfig = config.sizeBuckets[bucket];
+  return bucketConfig?.businessDays ?? 0;
 }
 
 export function computeDeadline(
@@ -44,16 +50,16 @@ export function computeDeadline(
   const businessDays = getAllowedBusinessDays(bucket, config);
 
   const deadline =
-    bucket === "large"
-      ? new Date(8640000000000000) // Max date for large PRs (effectively excluded)
+    bucket === null
+      ? new Date(8640000000000000) // Max date for excluded PRs
       : addBusinessDays(pr.requestedAt, businessDays, ctx);
 
   const now = new Date();
-  const isOverdue = bucket !== "large" && now > deadline;
+  const isOverdue = bucket !== null && now > deadline;
 
   return {
     ...pr,
-    bucket,
+    bucket: bucket ?? "excluded",
     deadline,
     isOverdue,
   };
@@ -66,7 +72,7 @@ export function computePRDeadlines(
 ): PRWithDeadline[] {
   return prs
     .map((pr) => computeDeadline(pr, config, ctx))
-    .filter((pr) => pr.bucket !== "large") // Exclude large PRs from SLO
+    .filter((pr) => pr.bucket !== "excluded") // Exclude PRs that exceed all buckets
     .sort((a, b) => a.deadline.getTime() - b.deadline.getTime()); // Sort by deadline
 }
 
@@ -95,11 +101,11 @@ export function computeBadMinutesInWindow(
     const runAt = new Date(run.runAt);
     const prevRunAt = i > 0 ? new Date(sortedRuns[i - 1]!.runAt) : null;
 
-    // Compute min deadline for PRs in this run (excluding large)
+    // Compute min deadline for PRs in this run (excluding those that exceed all buckets)
     let minDeadline: Date | null = null;
     for (const pr of run.prs) {
       const bucket = assignBucket(pr.loc, ctx.config);
-      if (bucket === "large") continue;
+      if (bucket === null) continue;
 
       const deadline = addBusinessDays(
         new Date(pr.requestedAt),

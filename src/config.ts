@@ -71,13 +71,7 @@ function mergeConfig(defaults: Config, overrides: Partial<Config>): Config {
     holidayCountryCode:
       overrides.holidayCountryCode || defaults.holidayCountryCode,
     slo: { ...defaults.slo, ...overrides.slo },
-    sizeBuckets: {
-      small: { ...defaults.sizeBuckets.small, ...overrides.sizeBuckets?.small },
-      medium: {
-        ...defaults.sizeBuckets.medium,
-        ...overrides.sizeBuckets?.medium,
-      },
-    },
+    sizeBuckets: overrides.sizeBuckets ?? defaults.sizeBuckets,
   };
 }
 
