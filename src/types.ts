@@ -41,22 +41,12 @@ export interface PRWithDeadline extends PR {
 export interface BudgetRun {
   type: "budget_run";
   runAt: string; // ISO timestamp
-  prevRunAt: string | null;
-  intervalBusinessMinutes: number;
-  badMinutes: number;
-  badInterval: {
-    start: string;
-    end: string;
-  } | null;
-  minDeadline: string | null;
   prs: Array<{
-    repo: string;
-    number: number;
     url: string;
     title: string;
-    requestedAt: string;
+    requestedAt: string; // ISO timestamp - when review was requested
     loc: number;
-    deadline: string;
+    reviewedAt: string | null; // ISO timestamp - when reviewed, null if still pending
   }>;
 }
 

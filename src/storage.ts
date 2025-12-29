@@ -37,11 +37,6 @@ export async function loadBudgetRuns(): Promise<BudgetRun[]> {
   return readJSONL<BudgetRun>(paths.budgetRuns);
 }
 
-export async function getLastBudgetRun(): Promise<BudgetRun | null> {
-  const runs = await loadBudgetRuns();
-  return runs.length > 0 ? runs[runs.length - 1]! : null;
-}
-
 // PTO storage
 export async function appendPTO(pto: PTOInterval): Promise<void> {
   await appendToJSONL(paths.pto, pto);
@@ -77,46 +72,3 @@ export async function pruneOldBudgetRuns(keepDays: number): Promise<number> {
   return pruned;
 }
 
-// Get budget runs within a window
-export function getBudgetRunsInWindow(
-  runs: BudgetRun[],
-  windowStart: Date,
-  windowEnd: Date
-): BudgetRun[] {
-  const startStr = windowStart.toISOString();
-  const endStr = windowEnd.toISOString();
-
-  return runs.filter((run) => {
-    // Run overlaps with window if run's interval overlaps
-    const runStart = run.prevRunAt || run.runAt;
-    const runEnd = run.runAt;
-    return runEnd >= startStr && runStart <= endStr;
-  });
-}
-
-// Calculate overlapping bad minutes within a window
-export function calculateBadMinutesInWindow(
-  runs: BudgetRun[],
-  windowStart: Date,
-  windowEnd: Date,
-  countBusinessMinutes: (start: Date, end: Date) => number
-): number {
-  let totalBadMinutes = 0;
-
-  for (const run of runs) {
-    if (!run.badInterval) continue;
-
-    const badStart = new Date(run.badInterval.start);
-    const badEnd = new Date(run.badInterval.end);
-
-    // Clamp to window
-    const overlapStart = badStart < windowStart ? windowStart : badStart;
-    const overlapEnd = badEnd > windowEnd ? windowEnd : badEnd;
-
-    if (overlapStart < overlapEnd) {
-      totalBadMinutes += countBusinessMinutes(overlapStart, overlapEnd);
-    }
-  }
-
-  return totalBadMinutes;
-}

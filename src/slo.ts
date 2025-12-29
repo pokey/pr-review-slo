@@ -12,7 +12,6 @@ import {
   countBusinessMinutes,
   getTotalBusinessMinutesInWindow,
 } from "./business-time";
-import { calculateBadMinutesInWindow, getBudgetRunsInWindow } from "./storage";
 
 export function assignBucket(
   loc: number,
@@ -76,6 +75,65 @@ export function getMinDeadline(prs: PRWithDeadline[]): Date | null {
   return prs[0]!.deadline; // Already sorted by deadline
 }
 
+/** Compute bad minutes from budget runs within a window, calculating deadlines on the fly */
+export function computeBadMinutesInWindow(
+  budgetRuns: BudgetRun[],
+  windowStart: Date,
+  windowEnd: Date,
+  ctx: BusinessTimeContext
+): number {
+  let badMinutes = 0;
+  const sortedRuns = [...budgetRuns]
+    .filter((run) => {
+      const runAt = new Date(run.runAt);
+      return runAt >= windowStart && runAt <= windowEnd;
+    })
+    .sort((a, b) => new Date(a.runAt).getTime() - new Date(b.runAt).getTime());
+
+  for (let i = 0; i < sortedRuns.length; i++) {
+    const run = sortedRuns[i]!;
+    const runAt = new Date(run.runAt);
+    const prevRunAt = i > 0 ? new Date(sortedRuns[i - 1]!.runAt) : null;
+
+    // Compute min deadline for PRs in this run (excluding large)
+    let minDeadline: Date | null = null;
+    for (const pr of run.prs) {
+      const bucket = assignBucket(pr.loc, ctx.config);
+      if (bucket === "large") continue;
+
+      const deadline = addBusinessDays(
+        new Date(pr.requestedAt),
+        getAllowedBusinessDays(bucket, ctx.config),
+        ctx
+      );
+
+      // Only count if not yet reviewed at this run time
+      if (pr.reviewedAt && new Date(pr.reviewedAt) <= runAt) continue;
+
+      if (!minDeadline || deadline < minDeadline) {
+        minDeadline = deadline;
+      }
+    }
+
+    // If something was overdue at this run
+    if (minDeadline && minDeadline < runAt) {
+      const badStart =
+        prevRunAt && prevRunAt > minDeadline ? prevRunAt : minDeadline;
+      const badEnd = runAt;
+
+      // Clamp to window
+      const overlapStart = badStart < windowStart ? windowStart : badStart;
+      const overlapEnd = badEnd > windowEnd ? windowEnd : badEnd;
+
+      if (overlapStart < overlapEnd) {
+        badMinutes += countBusinessMinutes(overlapStart, overlapEnd, ctx);
+      }
+    }
+  }
+
+  return badMinutes;
+}
+
 export function computeSLI(
   budgetRuns: BudgetRun[],
   windowStart: Date,
@@ -88,11 +146,11 @@ export function computeSLI(
     ctx
   );
 
-  const badMinutes = calculateBadMinutesInWindow(
+  const badMinutes = computeBadMinutesInWindow(
     budgetRuns,
     windowStart,
     windowEnd,
-    (start, end) => countBusinessMinutes(start, end, ctx)
+    ctx
   );
 
   const goodMinutes = totalBusinessMinutes - badMinutes;
@@ -112,41 +170,6 @@ export function computeSLI(
   };
 }
 
-export function computeErrorBudgetContribution(
-  prs: PRWithDeadline[],
-  prevRunAt: Date | null,
-  now: Date,
-  ctx: BusinessTimeContext
-): {
-  badMinutes: number;
-  badInterval: { start: Date; end: Date } | null;
-  intervalBusinessMinutes: number;
-} {
-  const intervalStart = prevRunAt || now;
-  const intervalBusinessMinutes = countBusinessMinutes(intervalStart, now, ctx);
-
-  const minDeadline = getMinDeadline(prs);
-
-  // If no PRs or nothing is overdue
-  if (!minDeadline || minDeadline >= now) {
-    return {
-      badMinutes: 0,
-      badInterval: null,
-      intervalBusinessMinutes,
-    };
-  }
-
-  // Something is overdue
-  const badStart = prevRunAt && prevRunAt > minDeadline ? prevRunAt : minDeadline;
-  const badMinutes = countBusinessMinutes(badStart, now, ctx);
-
-  return {
-    badMinutes,
-    badInterval: { start: badStart, end: now },
-    intervalBusinessMinutes,
-  };
-}
-
 export function computeReviewRecommendations(
   prs: PRWithDeadline[],
   budgetRuns: BudgetRun[],
@@ -158,16 +181,11 @@ export function computeReviewRecommendations(
   const windowStart = new Date(nextReviewTime);
   windowStart.setDate(windowStart.getDate() - ctx.config.slo.windowDays);
 
-  const runsInWindow = getBudgetRunsInWindow(
+  const histBadMinutes = computeBadMinutesInWindow(
     budgetRuns,
     windowStart,
-    nextReviewTime
-  );
-  const histBadMinutes = calculateBadMinutesInWindow(
-    runsInWindow,
-    windowStart,
     nextReviewTime,
-    (start, end) => countBusinessMinutes(start, end, ctx)
+    ctx
   );
 
   const totalBusinessMinutes = getTotalBusinessMinutesInWindow(

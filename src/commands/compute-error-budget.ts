@@ -1,21 +1,8 @@
 import { loadConfig } from "../config";
 import { fetchInScopePRs } from "../github";
-import {
-  createBusinessTimeContext,
-  countBusinessMinutes,
-} from "../business-time";
-import {
-  loadPTOIntervals,
-  loadBudgetRuns,
-  getLastBudgetRun,
-  appendBudgetRun,
-} from "../storage";
-import {
-  computePRDeadlines,
-  computeErrorBudgetContribution,
-  computeSLI,
-  getMinDeadline,
-} from "../slo";
+import { createBusinessTimeContext } from "../business-time";
+import { loadPTOIntervals, loadBudgetRuns, appendBudgetRun } from "../storage";
+import { computePRDeadlines, computeSLI, getMinDeadline } from "../slo";
 import type { BudgetRun } from "../types";
 
 export async function computeErrorBudgetContributionCommand(): Promise<void> {
@@ -40,46 +27,20 @@ export async function computeErrorBudgetContributionCommand(): Promise<void> {
     now
   );
 
-  // Compute deadlines for all PRs
+  // Compute deadlines for all PRs (for display)
   const prsWithDeadlines = computePRDeadlines(prs, config, ctx);
   console.log(`${prsWithDeadlines.length} PR(s) in scope (excluding large).`);
 
-  // Get last run
-  const lastRun = await getLastBudgetRun();
-  const prevRunAt = lastRun ? new Date(lastRun.runAt) : null;
-
-  // Compute error budget contribution for this interval
-  const contribution = computeErrorBudgetContribution(
-    prsWithDeadlines,
-    prevRunAt,
-    now,
-    ctx
-  );
-
-  const minDeadline = getMinDeadline(prsWithDeadlines);
-
-  // Create and store the budget run
+  // Create and store the budget run (just the facts)
   const budgetRun: BudgetRun = {
     type: "budget_run",
     runAt: now.toISOString(),
-    prevRunAt: prevRunAt?.toISOString() || null,
-    intervalBusinessMinutes: contribution.intervalBusinessMinutes,
-    badMinutes: contribution.badMinutes,
-    badInterval: contribution.badInterval
-      ? {
-          start: contribution.badInterval.start.toISOString(),
-          end: contribution.badInterval.end.toISOString(),
-        }
-      : null,
-    minDeadline: minDeadline?.toISOString() || null,
-    prs: prsWithDeadlines.map((pr) => ({
-      repo: pr.repo,
-      number: pr.number,
+    prs: prs.map((pr) => ({
       url: pr.url,
       title: pr.title,
       requestedAt: pr.requestedAt.toISOString(),
       loc: pr.loc,
-      deadline: pr.deadline.toISOString(),
+      reviewedAt: null,
     })),
   };
 
@@ -90,24 +51,15 @@ export async function computeErrorBudgetContributionCommand(): Promise<void> {
   const sli = computeSLI(budgetRuns, windowStart, now, ctx);
 
   // Output results
-  console.log("\n=== Error Budget Contribution ===");
-  console.log(`Run time: ${now.toISOString()}`);
-  if (prevRunAt) {
-    console.log(`Previous run: ${prevRunAt.toISOString()}`);
-    console.log(
-      `Interval business minutes: ${contribution.intervalBusinessMinutes}`
-    );
-  } else {
-    console.log("First run (no previous interval)");
-  }
+  const minDeadline = getMinDeadline(prsWithDeadlines);
+  const hasOverdue = minDeadline && minDeadline < now;
 
-  if (contribution.badMinutes > 0) {
-    console.log(`\nBad minutes this interval: ${contribution.badMinutes}`);
-    console.log(
-      `Bad interval: ${contribution.badInterval!.start.toISOString()} to ${contribution.badInterval!.end.toISOString()}`
-    );
+  console.log("\n=== Run Info ===");
+  console.log(`Run time: ${now.toISOString()}`);
+  if (hasOverdue) {
+    console.log(`Overdue since: ${minDeadline.toISOString()}`);
   } else {
-    console.log("\nNo bad minutes this interval.");
+    console.log("No overdue PRs.");
   }
 
   console.log("\n=== Current SLI (30-day rolling window) ===");
