@@ -21,7 +21,7 @@ COMMANDS:
   add-pto --from=YYYY-MM-DD --to=YYYY-MM-DD
                                   Add a PTO interval
   list-pto                        List all PTO intervals
-  status                          Show current SLO status and configuration
+  status [--json]                 Show current SLO status and configuration
 
 OPTIONS:
   --help, -h                      Show this help message
@@ -105,7 +105,14 @@ async function main() {
       }
 
       case "status": {
-        await statusCommand();
+        const { values } = parseArgs({
+          args: args.slice(1),
+          options: {
+            json: { type: "boolean" },
+          },
+          allowPositionals: true,
+        });
+        await statusCommand({ json: values.json ?? false });
         break;
       }
 
