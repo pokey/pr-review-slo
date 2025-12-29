@@ -124,6 +124,52 @@ All data is stored in `~/.pr-review-slo/`:
 - `pto.jsonl` - PTO intervals
 - `holidays-{year}.json` - Cached holiday data
 
+## Scheduling Daily Runs (macOS)
+
+Use launchd to run the SLO check automatically every day. Create a plist file at `~/Library/LaunchAgents/com.yourname.pr-review-slo.plist`:
+
+```xml
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>Label</key>
+    <string>com.yourname.pr-review-slo</string>
+    <key>ProgramArguments</key>
+    <array>
+        <string>/bin/bash</string>
+        <string>-c</string>
+        <string>GITHUB_TOKEN=ghp_xxx /path/to/bun /path/to/pr-review-slo compute-error-budget-contribution</string>
+    </array>
+    <key>StartCalendarInterval</key>
+    <dict>
+        <key>Hour</key>
+        <integer>12</integer>
+        <key>Minute</key>
+        <integer>0</integer>
+    </dict>
+    <key>StandardOutPath</key>
+    <string>/tmp/pr-review-slo.log</string>
+    <key>StandardErrorPath</key>
+    <string>/tmp/pr-review-slo.err</string>
+</dict>
+</plist>
+```
+
+Then load it:
+
+```bash
+launchctl load ~/Library/LaunchAgents/com.yourname.pr-review-slo.plist
+```
+
+To test immediately:
+
+```bash
+launchctl start com.yourname.pr-review-slo
+```
+
+Unlike cron, launchd will run missed jobs when your Mac wakes from sleep.
+
 ## Testing
 
 ```bash
