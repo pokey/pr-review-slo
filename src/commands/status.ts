@@ -75,6 +75,12 @@ export async function statusCommand(options: StatusOptions): Promise<void> {
   const value = (s: string | number) => pc.white(String(s));
   const heading = (s: string) => pc.bold(pc.cyan(s));
 
+  const minutesPerBusinessDay = (config.businessHours.end - config.businessHours.start) * 60;
+  const formatMinutesWithDays = (minutes: number) => {
+    const days = minutes / minutesPerBusinessDay;
+    return `${minutes} min ${pc.dim(`(${days.toFixed(2)}d)`)}`;
+  };
+
   console.log();
   console.log(heading("PR Review SLO Status"));
   console.log();
@@ -90,11 +96,11 @@ export async function statusCommand(options: StatusOptions): Promise<void> {
   const sliColor = sli.isMet ? pc.green : pc.red;
 
   console.log(`${label("SLI")}              ${sliColor(pc.bold(sliPercent.toFixed(2) + "%"))} ${pc.dim("/")} ${value(targetPercent.toFixed(0) + "%")} target`);
-  console.log(`${label("Budget remaining")} ${sliColor(sli.budgetRemaining.toFixed(0) + " min")} ${pc.dim("/")} ${value(sli.budgetMinutes.toFixed(0) + " min")} total`);
+  console.log(`${label("Budget remaining")} ${sliColor(formatMinutesWithDays(Math.round(sli.budgetRemaining)))} ${pc.dim("/")} ${value(formatMinutesWithDays(Math.round(sli.budgetMinutes)))} total`);
   console.log();
-  console.log(`${label("Good minutes")}     ${pc.green(sli.goodMinutes.toString())}`);
-  console.log(`${label("Bad minutes")}      ${sli.badMinutes > 0 ? pc.red(sli.badMinutes.toString()) : pc.dim("0")}`);
-  console.log(`${label("Total minutes")}    ${value(sli.totalBusinessMinutes)}`);
+  console.log(`${label("Good minutes")}     ${pc.green(formatMinutesWithDays(sli.goodMinutes))}`);
+  console.log(`${label("Bad minutes")}      ${sli.badMinutes > 0 ? pc.red(formatMinutesWithDays(sli.badMinutes)) : pc.dim("0 min (0.00d)")}`);
+  console.log(`${label("Total minutes")}    ${value(formatMinutesWithDays(sli.totalBusinessMinutes))}`);
   console.log();
 
   if (sli.isMet) {
