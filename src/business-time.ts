@@ -89,21 +89,76 @@ export function countBusinessMinutes(
 ): number {
   if (start >= end) return 0;
 
+  const { start: businessStart, end: businessEnd } = ctx.config.businessHours;
+  const minutesPerBusinessDay = (businessEnd - businessStart) * 60;
+  const tz = ctx.config.businessHours.timezone;
+
   let count = 0;
+
+  // Get timezone-adjusted dates for start and end
+  const startTz = toTimezone(start, tz);
+  const endTz = toTimezone(end, tz);
+
+  // Helper to get business minutes for a partial day
+  function getBusinessMinutesForDay(
+    date: Date,
+    fromHour: number,
+    fromMinute: number,
+    toHour: number,
+    toMinute: number
+  ): number {
+    if (!isBusinessDay(date, ctx) || isPTO(date, ctx.ptoIntervals)) {
+      return 0;
+    }
+
+    const effectiveStart = Math.max(fromHour * 60 + fromMinute, businessStart * 60);
+    const effectiveEnd = Math.min(toHour * 60 + toMinute, businessEnd * 60);
+
+    return Math.max(0, effectiveEnd - effectiveStart);
+  }
+
+  // Check if start and end are on the same day
+  const startDateStr = startTz.toISOString().slice(0, 10);
+  const endDateStr = endTz.toISOString().slice(0, 10);
+
+  if (startDateStr === endDateStr) {
+    // Same day - just count minutes in the range
+    return getBusinessMinutesForDay(
+      start,
+      startTz.getHours(),
+      startTz.getMinutes(),
+      endTz.getHours(),
+      endTz.getMinutes()
+    );
+  }
+
+  // Different days - count partial first day
+  count += getBusinessMinutesForDay(
+    start,
+    startTz.getHours(),
+    startTz.getMinutes(),
+    24,
+    0
+  );
+
+  // Count full days in between
   const current = new Date(start);
+  current.setDate(current.getDate() + 1);
+  // Reset to midnight
+  const currentTz = toTimezone(current, tz);
+  current.setHours(current.getHours() - currentTz.getHours());
+  current.setMinutes(current.getMinutes() - currentTz.getMinutes());
   current.setSeconds(0, 0);
 
-  // Round up to next minute
-  if (current.getTime() < start.getTime()) {
-    current.setMinutes(current.getMinutes() + 1);
+  while (toTimezone(current, tz).toISOString().slice(0, 10) < endDateStr) {
+    if (isBusinessDay(current, ctx) && !isPTO(current, ctx.ptoIntervals)) {
+      count += minutesPerBusinessDay;
+    }
+    current.setDate(current.getDate() + 1);
   }
 
-  while (current < end) {
-    if (isBusinessMinute(current, ctx)) {
-      count++;
-    }
-    current.setMinutes(current.getMinutes() + 1);
-  }
+  // Count partial last day
+  count += getBusinessMinutesForDay(end, 0, 0, endTz.getHours(), endTz.getMinutes());
 
   return count;
 }
@@ -124,10 +179,6 @@ export function addBusinessDays(
       daysAdded++;
     }
   }
-
-  // Set to end of business day
-  const tzResult = toTimezone(result, ctx.config.businessHours.timezone);
-  result.setHours(ctx.config.businessHours.end, 0, 0, 0);
 
   return result;
 }

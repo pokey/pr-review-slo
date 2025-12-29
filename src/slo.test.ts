@@ -79,19 +79,21 @@ describe("slo", () => {
     });
 
     test("computes deadline for small PR", () => {
-      const pr = makePR(100, new Date("2025-01-06T10:00:00-08:00")); // Monday
+      const pr = makePR(100, new Date("2025-01-06T18:00:00.000Z")); // Monday 10 AM PST
       const result = computeDeadline(pr, mockConfig, mockCtx);
 
       expect(result.bucket).toBe("small");
-      expect(result.deadline.getDay()).toBe(2); // Tuesday
+      // Small PR = 1 business day, so Tuesday at same time
+      expect(result.deadline.toISOString()).toBe("2025-01-07T18:00:00.000Z");
     });
 
     test("computes deadline for medium PR", () => {
-      const pr = makePR(500, new Date("2025-01-06T10:00:00-08:00")); // Monday
+      const pr = makePR(500, new Date("2025-01-06T18:00:00.000Z")); // Monday 10 AM PST
       const result = computeDeadline(pr, mockConfig, mockCtx);
 
       expect(result.bucket).toBe("medium");
-      expect(result.deadline.getDay()).toBe(4); // Thursday
+      // Medium PR = 3 business days, so Thursday at same time
+      expect(result.deadline.toISOString()).toBe("2025-01-09T18:00:00.000Z");
     });
 
     test("marks large PR as large bucket", () => {

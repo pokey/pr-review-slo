@@ -87,24 +87,54 @@ describe("business-time", () => {
 
   describe("addBusinessDays", () => {
     test("adds one business day on Monday", () => {
-      const monday = new Date("2025-01-06T10:00:00-08:00");
+      const monday = new Date("2025-01-06T18:00:00.000Z"); // Monday 10 AM PST
       const result = addBusinessDays(monday, 1, ctx);
-      // Should be Tuesday end of business day
-      expect(result.getDay()).toBe(2); // Tuesday
+      // Should be Tuesday at same time (10 AM PST = 18:00 UTC)
+      expect(result.toISOString()).toBe("2025-01-07T18:00:00.000Z");
     });
 
     test("skips weekend when adding business days", () => {
-      const friday = new Date("2025-01-10T10:00:00-08:00");
+      const friday = new Date("2025-01-10T18:00:00.000Z"); // Friday 10 AM PST
       const result = addBusinessDays(friday, 1, ctx);
-      // Should be Monday (skips Saturday and Sunday)
-      expect(result.getDay()).toBe(1); // Monday
+      // Should be Monday at same time (skips Saturday and Sunday)
+      expect(result.toISOString()).toBe("2025-01-13T18:00:00.000Z");
     });
 
     test("adds multiple business days", () => {
-      const monday = new Date("2025-01-06T10:00:00-08:00");
+      const monday = new Date("2025-01-06T18:00:00.000Z"); // Monday 10 AM PST
       const result = addBusinessDays(monday, 3, ctx);
-      // Monday + 3 business days = Thursday
-      expect(result.getDay()).toBe(4); // Thursday
+      // Monday + 3 business days = Thursday at same time
+      expect(result.toISOString()).toBe("2025-01-09T18:00:00.000Z");
+    });
+
+    test("skips holidays when adding business days", () => {
+      // MLK Day 2025 is Monday Jan 20
+      const ctxWithHoliday: BusinessTimeContext = {
+        ...ctx,
+        holidays: new Set(["2025-01-20"]),
+      };
+      const friday = new Date("2025-01-17T18:00:00.000Z"); // Friday Jan 17
+      const result = addBusinessDays(friday, 1, ctxWithHoliday);
+      // Should skip weekend (Sat/Sun) AND Monday holiday, land on Tuesday Jan 21
+      expect(result.toISOString()).toBe("2025-01-21T18:00:00.000Z");
+    });
+
+    test("skips PTO when adding business days", () => {
+      const ctxWithPTO: BusinessTimeContext = {
+        ...ctx,
+        ptoIntervals: [
+          {
+            type: "pto",
+            start: "2025-01-07",
+            end: "2025-01-08",
+            addedAt: new Date().toISOString(),
+          },
+        ],
+      };
+      const monday = new Date("2025-01-06T18:00:00.000Z"); // Monday Jan 6
+      const result = addBusinessDays(monday, 1, ctxWithPTO);
+      // Should skip Tuesday and Wednesday (PTO), land on Thursday Jan 9
+      expect(result.toISOString()).toBe("2025-01-09T18:00:00.000Z");
     });
   });
 
