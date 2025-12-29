@@ -105,6 +105,7 @@ export function computeBadMinutesInWindow(
     let minDeadline: Date | null = null;
     for (const pr of run.prs) {
       const bucket = assignBucket(pr.loc, ctx.config);
+      // Skip PRs that are too large (bucket === null means exceeds all size buckets)
       if (bucket === null) continue;
 
       const deadline = addBusinessDays(

@@ -29,9 +29,15 @@ export async function computeErrorBudgetContributionCommand(): Promise<void> {
 
   // Compute deadlines for all PRs (for display)
   const prsWithDeadlines = computePRDeadlines(prs, config, ctx);
-  console.log(`${prsWithDeadlines.length} PR(s) in scope (excluding large).`);
+  const largePRs = prs.length - prsWithDeadlines.length;
+  console.log(`${prsWithDeadlines.length} PR(s) in scope for SLO tracking.`);
+  if (largePRs > 0) {
+    console.log(`${largePRs} large PR(s) logged but excluded from SLO computation.`);
+  }
 
   // Create and store the budget run (just the facts)
+  // Note: This includes ALL PRs, even those too large for SLO tracking.
+  // Large PRs will be filtered out during error budget computation.
   const budgetRun: BudgetRun = {
     type: "budget_run",
     runAt: now.toISOString(),
