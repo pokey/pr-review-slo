@@ -90,7 +90,7 @@ export async function saveDefaultConfig(
 # Business days: 1=Mon, 7=Sun
 businessDays = [1, 2, 3, 4, 5]
 
-holidayCountryCode = "US"
+holidayCountryCode = "US"  # or "GB-ENG" for subregions
 
 [github]
 username = "${username}"

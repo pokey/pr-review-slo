@@ -3,10 +3,31 @@ import type { Holiday } from "./types";
 
 const NAGER_DATE_API = "https://date.nager.at/api/v3/PublicHolidays";
 
+/**
+ * Parse a country code that may include a subregion.
+ * e.g., "GB-ENG" → { apiCountryCode: "GB", subregion: "GB-ENG" }
+ * e.g., "US" → { apiCountryCode: "US", subregion: undefined }
+ */
+function parseCountryCode(countryCode: string): {
+  apiCountryCode: string;
+  subregion: string | undefined;
+} {
+  // Subregions are formatted as "XX-YYY" where XX is the country code
+  if (countryCode.length > 2 && countryCode[2] === "-") {
+    return {
+      apiCountryCode: countryCode.slice(0, 2),
+      subregion: countryCode,
+    };
+  }
+  return { apiCountryCode: countryCode, subregion: undefined };
+}
+
 export async function fetchHolidays(
   year: number,
   countryCode: string
 ): Promise<Holiday[]> {
+  const { apiCountryCode, subregion } = parseCountryCode(countryCode);
+
   // Check cache first
   const cacheFile = Bun.file(paths.holidayCache(year));
   if (await cacheFile.exists()) {
@@ -17,7 +38,7 @@ export async function fetchHolidays(
   }
 
   // Fetch from API
-  const url = `${NAGER_DATE_API}/${year}/${countryCode}`;
+  const url = `${NAGER_DATE_API}/${year}/${apiCountryCode}`;
   const response = await fetch(url);
 
   if (!response.ok) {
@@ -31,9 +52,16 @@ export async function fetchHolidays(
     localName: string;
     name: string;
     countryCode: string;
+    global: boolean;
+    counties: string[] | null;
   }>;
 
-  const holidays: Holiday[] = data.map((h) => ({
+  // Filter by subregion if specified
+  const filtered = subregion
+    ? data.filter((h) => h.global || h.counties?.includes(subregion))
+    : data;
+
+  const holidays: Holiday[] = filtered.map((h) => ({
     date: h.date,
     name: h.name,
     countryCode: h.countryCode,

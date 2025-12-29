@@ -9,7 +9,7 @@ export interface Config {
     timezone: string; // e.g., "America/Los_Angeles"
   };
   businessDays: number[]; // 1=Mon, 5=Fri, so [1,2,3,4,5]
-  holidayCountryCode: string; // e.g., "US"
+  holidayCountryCode: string; // e.g., "US" or "GB-ENG" for subregion
   slo: {
     target: number; // 0.90
     windowDays: number; // 30
