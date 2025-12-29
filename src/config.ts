@@ -24,7 +24,7 @@ const DEFAULT_CONFIG: Config = {
   },
   businessHours: {
     start: 9,
-    end: 19,
+    end: 17,
     timezone: "America/Los_Angeles",
   },
   businessDays: [1, 2, 3, 4, 5], // Mon-Fri
@@ -94,7 +94,7 @@ username = "${username}"
 
 [businessHours]
 start = 9
-end = 19
+end = 17
 timezone = "America/Los_Angeles"
 
 [slo]

@@ -73,7 +73,7 @@ bun run src/cli.ts status
 
 ### Business Time
 
-- Business hours: 09:00-19:00 (configurable)
+- Business hours: 09:00-17:00 (configurable)
 - Business days: Mon-Fri
 - Excludes public holidays (fetched from Nager.Date API)
 - Excludes PTO intervals
@@ -96,7 +96,7 @@ username = "yourname"
 
 [businessHours]
 start = 9
-end = 19
+end = 17
 timezone = "America/Los_Angeles"
 
 businessDays = [1, 2, 3, 4, 5]  # Mon-Fri

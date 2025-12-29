@@ -50,7 +50,7 @@ Let **BusinessMinutes(t0, t1]** be the count of minutes in the interval that are
 Recommended v1 rules (configurable):
 
 - Business days: Mon–Fri.
-- Business hours: 09:00–19:00 (local time).
+- Business hours: 09:00–17:00 (local time).
 - Exclude public holidays (see holiday section).
 - (PTO handling: see below; v1 can ignore or treat as business time.)
 

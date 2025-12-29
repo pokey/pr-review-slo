@@ -5,7 +5,7 @@ export interface Config {
   };
   businessHours: {
     start: number; // 9 for 9:00
-    end: number; // 19 for 19:00
+    end: number; // 17 for 17:00
     timezone: string; // e.g., "America/Los_Angeles"
   };
   businessDays: number[]; // 1=Mon, 5=Fri, so [1,2,3,4,5]

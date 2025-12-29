@@ -42,7 +42,7 @@ src/
 ```
 
 ### Key Constants
-- Business hours: 09:00-19:00
+- Business hours: 09:00-17:00
 - Business days: Mon-Fri
 - SLO target: 90%
 - Rolling window: 30 days
