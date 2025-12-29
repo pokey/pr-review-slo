@@ -49,7 +49,6 @@ export async function statusCommand(): Promise<void> {
     console.log("=== Last Run ===");
     console.log(`Time: ${lastRun.runAt}`);
     console.log(`PRs in queue: ${lastRun.prs.length}`);
-    console.log(`Bad minutes: ${lastRun.badMinutes}`);
   }
 
   // Configuration summary
