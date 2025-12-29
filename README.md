@@ -65,11 +65,11 @@ bun run src/cli.ts status
 
 ### Size Buckets & Deadlines
 
-| Size | LOC | Deadline |
-|------|-----|----------|
-| Small | < 200 | 1 business day |
-| Medium | < 800 | 3 business days |
-| Large | ≥ 800 | Excluded from SLO |
+| Size   | LOC   | Deadline          |
+| ------ | ----- | ----------------- |
+| Small  | < 200 | 1 business day    |
+| Medium | < 800 | 3 business days   |
+| Large  | ≥ 800 | Excluded from SLO |
 
 ### Business Time
 
@@ -81,6 +81,7 @@ bun run src/cli.ts status
 ### Error Budget
 
 With a 90% SLO target over 30 days:
+
 - ~10% of business minutes can be "bad" (have overdue PRs)
 - The tool tracks bad minutes and warns when budget is running low
 
@@ -117,6 +118,7 @@ businessDays = 3
 ## Data Storage
 
 All data is stored in `~/.pr-review-slo/`:
+
 - `config.toml` - Configuration
 - `budget-runs.jsonl` - Historical budget run records
 - `pto.jsonl` - PTO intervals
