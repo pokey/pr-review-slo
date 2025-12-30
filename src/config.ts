@@ -108,6 +108,13 @@ businessDays = 1
 [sizeBuckets.medium]
 maxLoc = 800
 businessDays = 3
+
+# Example: Tighter SLO for code owner reviews on a specific team
+# [sizeBuckets.code-owner-urgent]
+# maxLoc = 800
+# businessDays = 1
+# asCodeOwner = true
+# requestedReviewer = "my-team"
 `;
 
   await Bun.write(p.config, content);

@@ -1,3 +1,10 @@
+export interface SizeBucket {
+  maxLoc: number;
+  businessDays: number;
+  asCodeOwner?: boolean; // If set, only matches PRs where asCodeOwner matches this value
+  requestedReviewer?: string; // If set, only matches PRs where requestedReviewer matches (username or team name)
+}
+
 export interface Config {
   github: {
     username: string;
@@ -14,7 +21,7 @@ export interface Config {
     target: number; // 0.90
     windowDays: number; // 30
   };
-  sizeBuckets: Record<string, { maxLoc: number; businessDays: number }>;
+  sizeBuckets: Record<string, SizeBucket>;
 }
 
 export interface PR {
@@ -33,7 +40,7 @@ export interface PR {
 
 export interface PRWithDeadline extends PR {
   deadline: Date;
-  bucket: string;
+  bucket: string | null;
   isOverdue: boolean;
 }
 

@@ -1,7 +1,6 @@
 import { test, expect, describe } from "bun:test";
 import {
   assignBucket,
-  getAllowedBusinessDays,
   computeDeadline,
   getMinDeadline,
 } from "./slo";
@@ -32,36 +31,106 @@ const mockCtx: BusinessTimeContext = {
 
 describe("slo", () => {
   describe("assignBucket", () => {
+    const makePR = (loc: number, asCodeOwner = false, requestedReviewer = "someone") =>
+      ({ loc, asCodeOwner, requestedReviewer });
+
     test("assigns small bucket for <200 LOC", () => {
-      expect(assignBucket(0, mockConfig)).toBe("small");
-      expect(assignBucket(100, mockConfig)).toBe("small");
-      expect(assignBucket(199, mockConfig)).toBe("small");
+      expect(assignBucket(makePR(0), mockConfig)?.[0]).toBe("small");
+      expect(assignBucket(makePR(100), mockConfig)?.[0]).toBe("small");
+      expect(assignBucket(makePR(199), mockConfig)?.[0]).toBe("small");
     });
 
     test("assigns medium bucket for 200-799 LOC", () => {
-      expect(assignBucket(200, mockConfig)).toBe("medium");
-      expect(assignBucket(500, mockConfig)).toBe("medium");
-      expect(assignBucket(799, mockConfig)).toBe("medium");
+      expect(assignBucket(makePR(200), mockConfig)?.[0]).toBe("medium");
+      expect(assignBucket(makePR(500), mockConfig)?.[0]).toBe("medium");
+      expect(assignBucket(makePR(799), mockConfig)?.[0]).toBe("medium");
     });
 
     test("returns null for >=800 LOC (exceeds all buckets)", () => {
-      expect(assignBucket(800, mockConfig)).toBeNull();
-      expect(assignBucket(1000, mockConfig)).toBeNull();
-      expect(assignBucket(10000, mockConfig)).toBeNull();
-    });
-  });
-
-  describe("getAllowedBusinessDays", () => {
-    test("returns 1 day for small bucket", () => {
-      expect(getAllowedBusinessDays("small", mockConfig)).toBe(1);
+      expect(assignBucket(makePR(800), mockConfig)).toBeNull();
+      expect(assignBucket(makePR(1000), mockConfig)).toBeNull();
     });
 
-    test("returns 3 days for medium bucket", () => {
-      expect(getAllowedBusinessDays("medium", mockConfig)).toBe(3);
+    test("returns bucket with minimum businessDays when multiple match", () => {
+      const configWithFilters: Config = {
+        ...mockConfig,
+        sizeBuckets: {
+          small: { maxLoc: 200, businessDays: 1 },
+          medium: { maxLoc: 800, businessDays: 3 },
+          "code-owner-urgent": { maxLoc: 800, businessDays: 0.5, asCodeOwner: true },
+        },
+      };
+
+      // Code owner review should get code-owner-urgent (0.5 days) not small (1 day)
+      const result = assignBucket(makePR(100, true), configWithFilters);
+      expect(result?.[0]).toBe("code-owner-urgent");
+      expect(result?.[1].businessDays).toBe(0.5);
     });
 
-    test("returns 0 days for null bucket (excluded)", () => {
-      expect(getAllowedBusinessDays(null, mockConfig)).toBe(0);
+    test("filters by requestedReviewer", () => {
+      const configWithFilters: Config = {
+        ...mockConfig,
+        sizeBuckets: {
+          small: { maxLoc: 200, businessDays: 1 },
+          "team-urgent": { maxLoc: 500, businessDays: 0.5, requestedReviewer: "core-team" },
+        },
+      };
+
+      // core-team reviewer should get team-urgent
+      expect(assignBucket(makePR(100, false, "core-team"), configWithFilters)?.[0]).toBe("team-urgent");
+      // other reviewers should get small
+      expect(assignBucket(makePR(100, false, "someone-else"), configWithFilters)?.[0]).toBe("small");
+    });
+
+    test("respects LOC limit even with matching filters", () => {
+      const configWithFilters: Config = {
+        ...mockConfig,
+        sizeBuckets: {
+          medium: { maxLoc: 800, businessDays: 3 },
+          "team-urgent": { maxLoc: 500, businessDays: 0.5, requestedReviewer: "core-team" },
+        },
+      };
+
+      // PR too large for team-urgent should fall back to medium
+      expect(assignBucket(makePR(600, false, "core-team"), configWithFilters)?.[0]).toBe("medium");
+    });
+
+    test("does not match bucket when asCodeOwner filter doesn't match", () => {
+      const configWithFilters: Config = {
+        ...mockConfig,
+        sizeBuckets: {
+          small: { maxLoc: 200, businessDays: 1 },
+          "code-owner-urgent": { maxLoc: 800, businessDays: 0.5, asCodeOwner: true },
+        },
+      };
+
+      // Non-code owner should get small, not code-owner-urgent
+      expect(assignBucket(makePR(100, false), configWithFilters)?.[0]).toBe("small");
+    });
+
+    test("does not match bucket when requestedReviewer filter doesn't match", () => {
+      const configWithFilters: Config = {
+        ...mockConfig,
+        sizeBuckets: {
+          small: { maxLoc: 200, businessDays: 1 },
+          "team-urgent": { maxLoc: 500, businessDays: 0.5, requestedReviewer: "core-team" },
+        },
+      };
+
+      // Different reviewer should get small, not team-urgent
+      expect(assignBucket(makePR(100, false, "other-team"), configWithFilters)?.[0]).toBe("small");
+    });
+
+    test("returns null when no buckets match due to filters", () => {
+      const configWithFilters: Config = {
+        ...mockConfig,
+        sizeBuckets: {
+          "code-owner-only": { maxLoc: 800, businessDays: 1, asCodeOwner: true },
+        },
+      };
+
+      // Non-code owner PR has no matching bucket
+      expect(assignBucket(makePR(100, false), configWithFilters)).toBeNull();
     });
   });
 
@@ -102,7 +171,7 @@ describe("slo", () => {
       const pr = makePR(1000, new Date("2025-01-06T10:00:00-08:00"));
       const result = computeDeadline(pr, mockConfig, mockCtx);
 
-      expect(result.bucket).toBe("excluded");
+      expect(result.bucket).toBeNull();
       expect(result.isOverdue).toBe(false); // Excluded PRs are never overdue
     });
 
@@ -127,7 +196,7 @@ describe("slo", () => {
   describe("getMinDeadline", () => {
     const makePRWithDeadline = (
       deadline: Date,
-      bucket: string = "small"
+      bucket: string | null = "small"
     ): PRWithDeadline => ({
       repo: "org/repo",
       number: 1,

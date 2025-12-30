@@ -5,6 +5,7 @@ import type {
   BudgetRun,
   SLIResult,
   ReviewRecommendation,
+  SizeBucket,
 } from "./types";
 import {
   type BusinessTimeContext,
@@ -13,32 +14,38 @@ import {
   getTotalBusinessMinutesInWindow,
 } from "./business-time";
 
-/** Get buckets sorted by maxLoc ascending */
-export function getSortedBuckets(config: Config): Array<[string, { maxLoc: number; businessDays: number }]> {
-  return Object.entries(config.sizeBuckets).sort(([, a], [, b]) => a.maxLoc - b.maxLoc);
+/** Check if a bucket matches a PR based on optional filters */
+function bucketMatchesPR(
+  bucket: SizeBucket,
+  pr: { loc: number; asCodeOwner: boolean; requestedReviewer: string }
+): boolean {
+  if (pr.loc >= bucket.maxLoc) return false;
+  if (bucket.asCodeOwner !== undefined && bucket.asCodeOwner !== pr.asCodeOwner)
+    return false;
+  if (
+    bucket.requestedReviewer !== undefined &&
+    bucket.requestedReviewer !== pr.requestedReviewer
+  )
+    return false;
+  return true;
 }
 
-/** Assign a PR to a bucket based on LOC. Returns null if PR exceeds all buckets (excluded from SLO). */
+/**
+ * Find the matching bucket with minimum businessDays for a PR.
+ * Returns null if no buckets match (excluded from SLO).
+ */
 export function assignBucket(
-  loc: number,
+  pr: { loc: number; asCodeOwner: boolean; requestedReviewer: string },
   config: Config
-): string | null {
-  const sortedBuckets = getSortedBuckets(config);
-  for (const [name, bucket] of sortedBuckets) {
-    if (loc < bucket.maxLoc) {
-      return name;
+): [string, SizeBucket] | null {
+  let best: [string, SizeBucket] | null = null;
+  for (const [name, bucket] of Object.entries(config.sizeBuckets)) {
+    if (!bucketMatchesPR(bucket, pr)) continue;
+    if (best === null || bucket.businessDays < best[1].businessDays) {
+      best = [name, bucket];
     }
   }
-  return null; // Exceeds all buckets, excluded from SLO
-}
-
-export function getAllowedBusinessDays(
-  bucket: string | null,
-  config: Config
-): number {
-  if (bucket === null) return 0; // Excluded PRs
-  const bucketConfig = config.sizeBuckets[bucket];
-  return bucketConfig?.businessDays ?? 0;
+  return best;
 }
 
 export function computeDeadline(
@@ -46,22 +53,25 @@ export function computeDeadline(
   config: Config,
   ctx: BusinessTimeContext
 ): PRWithDeadline {
-  const bucket = assignBucket(pr.loc, config);
-  const businessDays = getAllowedBusinessDays(bucket, config);
+  const assigned = assignBucket(pr, config);
 
-  const deadline =
-    bucket === null
-      ? new Date(8640000000000000) // Max date for excluded PRs
-      : addBusinessDays(pr.requestedAt, businessDays, ctx);
+  if (assigned === null) {
+    return {
+      ...pr,
+      bucket: null,
+      deadline: new Date(8640000000000000),
+      isOverdue: false,
+    };
+  }
 
-  const now = new Date();
-  const isOverdue = bucket !== null && now > deadline;
+  const [bucketName, bucket] = assigned;
+  const deadline = addBusinessDays(pr.requestedAt, bucket.businessDays, ctx);
 
   return {
     ...pr,
-    bucket: bucket ?? "excluded",
+    bucket: bucketName,
     deadline,
-    isOverdue,
+    isOverdue: new Date() > deadline,
   };
 }
 
@@ -72,8 +82,8 @@ export function computePRDeadlines(
 ): PRWithDeadline[] {
   return prs
     .map((pr) => computeDeadline(pr, config, ctx))
-    .filter((pr) => pr.bucket !== "excluded") // Exclude PRs that exceed all buckets
-    .sort((a, b) => a.deadline.getTime() - b.deadline.getTime()); // Sort by deadline
+    .filter((pr) => pr.bucket !== null)
+    .sort((a, b) => a.deadline.getTime() - b.deadline.getTime());
 }
 
 export function getMinDeadline(prs: PRWithDeadline[]): Date | null {
@@ -101,21 +111,20 @@ export function computeBadMinutesInWindow(
     const runAt = new Date(run.runAt);
     const prevRunAt = i > 0 ? new Date(sortedRuns[i - 1]!.runAt) : null;
 
-    // Compute min deadline for PRs in this run (excluding those that exceed all buckets)
+    // Compute min deadline for PRs in this run
     let minDeadline: Date | null = null;
     for (const pr of run.prs) {
-      const bucket = assignBucket(pr.loc, ctx.config);
-      // Skip PRs that are too large (bucket === null means exceeds all size buckets)
-      if (bucket === null) continue;
+      // Only count if not yet reviewed at this run time
+      if (pr.reviewedAt && new Date(pr.reviewedAt) <= runAt) continue;
+
+      const assigned = assignBucket(pr, ctx.config);
+      if (assigned === null) continue;
 
       const deadline = addBusinessDays(
         new Date(pr.requestedAt),
-        getAllowedBusinessDays(bucket, ctx.config),
+        assigned[1].businessDays,
         ctx
       );
-
-      // Only count if not yet reviewed at this run time
-      if (pr.reviewedAt && new Date(pr.reviewedAt) <= runAt) continue;
 
       if (!minDeadline || deadline < minDeadline) {
         minDeadline = deadline;
