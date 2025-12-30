@@ -1,6 +1,6 @@
 #!/usr/bin/env bun
 import { parseArgs } from "node:util";
-import { computeErrorBudgetContributionCommand } from "./commands/compute-error-budget";
+import { logReviewRequestsCommand } from "./commands/log-review-requests";
 import { getPRsToReviewCommand } from "./commands/get-prs-to-review";
 import { addPTOCommand, listPTOCommand } from "./commands/add-pto";
 import { initCommand } from "./commands/init";
@@ -14,8 +14,7 @@ USAGE:
 
 COMMANDS:
   init <username>                 Initialize configuration for a GitHub user
-  compute-error-budget-contribution
-                                  Record current PR queue and compute error budget contribution
+  log-review-requests             Log current PR review requests to file
   get-prs-to-review [--review-hour=N]
                                   Get recommendations for which PRs to review
   add-pto --from=YYYY-MM-DD --to=YYYY-MM-DD
@@ -31,7 +30,7 @@ ENVIRONMENT:
 
 EXAMPLES:
   pr-review-slo init myusername
-  pr-review-slo compute-error-budget-contribution
+  pr-review-slo log-review-requests
   pr-review-slo get-prs-to-review --review-hour=13
   pr-review-slo add-pto --from=2025-12-24 --to=2025-12-31
 `;
@@ -59,8 +58,8 @@ async function main() {
         break;
       }
 
-      case "compute-error-budget-contribution": {
-        await computeErrorBudgetContributionCommand();
+      case "log-review-requests": {
+        await logReviewRequestsCommand();
         break;
       }
 

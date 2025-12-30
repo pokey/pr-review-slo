@@ -28,12 +28,12 @@ export GITHUB_TOKEN=ghp_xxxxxxxxxxxx
 
 ## Usage
 
-### Daily SLO Check
+### Log Review Requests
 
-Record your current PR queue and compute error budget contribution:
+Log your current PR review requests to file:
 
 ```bash
-bun run src/cli.ts compute-error-budget-contribution
+bun run src/cli.ts log-review-requests
 ```
 
 ### Get Review Recommendations
@@ -139,7 +139,7 @@ Use launchd to run the SLO check automatically every day. Create a plist file at
     <array>
         <string>/bin/bash</string>
         <string>-c</string>
-        <string>GITHUB_TOKEN=ghp_xxx /path/to/bun /path/to/pr-review-slo compute-error-budget-contribution</string>
+        <string>GITHUB_TOKEN=ghp_xxx /path/to/bun /path/to/pr-review-slo log-review-requests</string>
     </array>
     <key>StartCalendarInterval</key>
     <dict>
