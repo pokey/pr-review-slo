@@ -2,6 +2,8 @@
 
 CLI tool for tracking personal PR review responsiveness as an SLO (Service Level Objective).
 
+![Status command screenshot](docs/images/status-screenshot.png)
+
 **SLO Definition:** Over any rolling 30-day window, at least 90% of business minutes have zero overdue PR review requests assigned to me.
 
 ## Installation
