@@ -132,8 +132,18 @@ export async function statusCommand(options: StatusOptions): Promise<void> {
   console.log(`${label("Holiday country")}  ${value(config.holidayCountryCode)}`);
   const bucketEntries = Object.entries(config.sizeBuckets)
     .sort(([, a], [, b]) => a.maxLoc - b.maxLoc);
+  const formatBucket = (name: string, bucket: typeof config.sizeBuckets[string]) => {
+    const parts = [`<${bucket.maxLoc} LOC`, `${bucket.businessDays}d`];
+    if (bucket.asCodeOwner !== undefined) {
+      parts.push(bucket.asCodeOwner ? "codeOwner" : "!codeOwner");
+    }
+    if (bucket.requestedReviewer !== undefined) {
+      parts.push(`@${bucket.requestedReviewer}`);
+    }
+    return `${pc.dim(name)} ${value(parts.join(", "))}`;
+  };
   const bucketStr = bucketEntries
-    .map(([name, bucket]) => `${pc.dim(name)} ${value(`<${bucket.maxLoc} LOC, ${bucket.businessDays}d`)}`)
+    .map(([name, bucket]) => formatBucket(name, bucket))
     .join("  ");
   console.log(`${label("Size buckets")}     ${bucketStr}`);
 
