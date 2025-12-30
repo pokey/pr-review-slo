@@ -77,12 +77,20 @@ interface GraphQLResponse {
         additions: number;
         deletions: number;
         isDraft: boolean;
+        viewerLatestReviewRequest: {
+          asCodeOwner: boolean;
+          requestedReviewer: {
+            login?: string;
+            name?: string;
+          };
+        } | null;
         timelineItems: {
           nodes: Array<{
             __typename: string;
             createdAt?: string;
             requestedReviewer?: {
               login?: string;
+              name?: string;
             };
           }>;
         };
@@ -94,13 +102,14 @@ interface GraphQLResponse {
 
 export async function getPRDetails(
   repo: string,
-  number: number,
-  username: string
+  number: number
 ): Promise<{
   additions: number;
   deletions: number;
   isDraft: boolean;
   requestedAt: Date | null;
+  requestedReviewer: string | null;
+  asCodeOwner: boolean;
 }> {
   const [owner, name] = repo.split("/");
 
@@ -111,15 +120,21 @@ export async function getPRDetails(
           additions
           deletions
           isDraft
-          timelineItems(first: 100, itemTypes: [REVIEW_REQUESTED_EVENT]) {
+          viewerLatestReviewRequest {
+            asCodeOwner
+            requestedReviewer {
+              ... on User { login }
+              ... on Team { name }
+            }
+          }
+          timelineItems(last: 20, itemTypes: [REVIEW_REQUESTED_EVENT]) {
             nodes {
               __typename
               ... on ReviewRequestedEvent {
                 createdAt
                 requestedReviewer {
-                  ... on User {
-                    login
-                  }
+                  ... on User { login }
+                  ... on Team { name }
                 }
               }
             }
@@ -151,18 +166,35 @@ export async function getPRDetails(
 
   const pr = data.data!.repository.pullRequest;
 
-  // Find the most recent review request event for this user
+  // Get the reviewer from viewerLatestReviewRequest
+  const viewerRequest = pr.viewerLatestReviewRequest;
+  if (!viewerRequest) {
+    return {
+      additions: pr.additions,
+      deletions: pr.deletions,
+      isDraft: pr.isDraft,
+      requestedAt: null,
+      requestedReviewer: null,
+      asCodeOwner: false,
+    };
+  }
+
+  const requestedReviewer =
+    viewerRequest.requestedReviewer.login ??
+    viewerRequest.requestedReviewer.name ??
+    null;
+
+  // Find the most recent review request event matching the reviewer
   // Events are returned in chronological order, so we want the last matching one
   let requestedAt: Date | null = null;
-  const usernameLower = username.toLowerCase();
 
   for (const node of pr.timelineItems.nodes) {
-    if (
-      node.__typename === "ReviewRequestedEvent" &&
-      node.requestedReviewer?.login?.toLowerCase() === usernameLower &&
-      node.createdAt
-    ) {
-      requestedAt = new Date(node.createdAt);
+    if (node.__typename === "ReviewRequestedEvent" && node.createdAt) {
+      const eventReviewer =
+        node.requestedReviewer?.login ?? node.requestedReviewer?.name;
+      if (eventReviewer === requestedReviewer) {
+        requestedAt = new Date(node.createdAt);
+      }
     }
   }
 
@@ -171,6 +203,8 @@ export async function getPRDetails(
     deletions: pr.deletions,
     isDraft: pr.isDraft,
     requestedAt,
+    requestedReviewer,
+    asCodeOwner: viewerRequest.asCodeOwner,
   };
 }
 
@@ -191,10 +225,10 @@ export async function fetchInScopePRs(config: Config): Promise<PR[]> {
 
   for (const result of searchResults) {
     try {
-      const details = await getPRDetails(result.repo, result.number, username);
+      const details = await getPRDetails(result.repo, result.number);
 
       // Skip if we couldn't determine when review was requested
-      if (!details.requestedAt) {
+      if (!details.requestedAt || !details.requestedReviewer) {
         console.error(
           `Warning: Could not find review request time for ${result.repo}#${result.number}`
         );
@@ -216,6 +250,8 @@ export async function fetchInScopePRs(config: Config): Promise<PR[]> {
         additions: details.additions,
         deletions: details.deletions,
         isDraft: details.isDraft,
+        requestedReviewer: details.requestedReviewer,
+        asCodeOwner: details.asCodeOwner,
       });
     } catch (err) {
       console.error(

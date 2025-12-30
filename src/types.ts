@@ -27,6 +27,8 @@ export interface PR {
   additions: number;
   deletions: number;
   isDraft: boolean;
+  requestedReviewer: string; // username or team name
+  asCodeOwner: boolean;
 }
 
 export interface PRWithDeadline extends PR {
@@ -44,6 +46,8 @@ export interface BudgetRun {
     requestedAt: string; // ISO timestamp - when review was requested
     loc: number;
     reviewedAt: string | null; // ISO timestamp - when reviewed, null if still pending
+    requestedReviewer: string; // username or team name
+    asCodeOwner: boolean;
   }>;
 }
 

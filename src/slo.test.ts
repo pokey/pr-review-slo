@@ -76,6 +76,8 @@ describe("slo", () => {
       additions: loc / 2,
       deletions: loc / 2,
       isDraft: false,
+      requestedReviewer: "testuser",
+      asCodeOwner: false,
     });
 
     test("computes deadline for small PR", () => {
@@ -136,6 +138,8 @@ describe("slo", () => {
       additions: 50,
       deletions: 50,
       isDraft: false,
+      requestedReviewer: "testuser",
+      asCodeOwner: false,
       deadline,
       bucket,
       isOverdue: false,

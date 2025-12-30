@@ -47,6 +47,8 @@ export async function computeErrorBudgetContributionCommand(): Promise<void> {
       requestedAt: pr.requestedAt.toISOString(),
       loc: pr.loc,
       reviewedAt: null,
+      requestedReviewer: pr.requestedReviewer,
+      asCodeOwner: pr.asCodeOwner,
     })),
   };
 
@@ -82,10 +84,12 @@ export async function computeErrorBudgetContributionCommand(): Promise<void> {
     console.log("\n=== PRs in Queue ===");
     for (const pr of prsWithDeadlines) {
       const status = pr.isOverdue ? "OVERDUE" : "OK";
+      const codeOwnerTag = pr.asCodeOwner ? " [code owner]" : "";
       console.log(
         `[${status}] ${pr.repo}#${pr.number} (${pr.bucket}, ${pr.loc} LOC)`
       );
       console.log(`  Title: ${pr.title}`);
+      console.log(`  Requested by: ${pr.requestedReviewer}${codeOwnerTag}`);
       console.log(`  Requested: ${pr.requestedAt.toISOString()}`);
       console.log(`  Deadline: ${pr.deadline.toISOString()}`);
       console.log(`  URL: ${pr.url}`);
